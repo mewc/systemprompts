@@ -29,7 +29,7 @@ then
   git config --local user.name 'mewc'
   git config --local user.email 'm@mewc.info'
   
-  git add data/prompts/
+  git add logs/
   
   if git diff --staged --quiet; then
     echo "No changes to commit"
