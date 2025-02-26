@@ -7,7 +7,7 @@ To track the responses of inquiries into system prompts from the main ai llm mod
 ## How it Works
 
 - Runs daily GitHub Actions workflow
-- Fetches system prompts from various AI models in a github action
+- Fetches system prompts from various AI models and see what we get
 - Archives prompts with timestamps in a structured format
 - Maintains history of changes over time in the repo publically
 
@@ -17,16 +17,16 @@ To track the responses of inquiries into system prompts from the main ai llm mod
 
 ## Security Notes
 
-- Only tracks publicly available system prompts
 - No API keys or private credentials stored in the repository
 - All data sourced from official public channels
 
 ## Contribute
 
-Want more models? More detail
+Want more models? More detail?
 
 ## TODO
 
+- UI that pulls in all the log data to visualise, diff, etc.
 - randomisation of prompts to a/b test
 - follow up questions
 - ...etc
@@ -34,6 +34,7 @@ Want more models? More detail
 ## Credits
 
 idea: https://x.com/NickADobos/status/1893872882658193729
+
 inspo: https://github.com/statsig-io/statuspage 
 
 # Contact
