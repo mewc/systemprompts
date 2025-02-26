@@ -19,8 +19,8 @@ yarn install
 # Build the project
 yarn build
 
-# Run the update script
-yarn update
+# Run the "do" script
+yarn do
 
 if [[ $commit == true ]]
 then
