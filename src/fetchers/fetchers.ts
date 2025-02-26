@@ -128,73 +128,126 @@ const sendMessage = async (
 
 // Check if we've already run this model recently (within the last 24 hours)
 const hasRecentRun = async (provider: ProviderConfig): Promise<boolean> => {
-  const LOGS_DIR = path.join(__dirname, "../logs");
+  const LOGS_DIR = path.join(__dirname, "../../logs");
   const providerDir = path.join(LOGS_DIR, provider.modelProvider.toLowerCase());
   const modelDir = path.join(providerDir, provider.modelName.toLowerCase());
 
+  console.log(`Checking for recent runs in: ${modelDir}`);
+
   try {
-    // Check if directory exists
-    await fs.access(modelDir);
+    // Ensure directories exist
+    await fs.mkdir(LOGS_DIR, { recursive: true });
+    await fs.mkdir(providerDir, { recursive: true });
+    await fs.mkdir(modelDir, { recursive: true });
 
     // Get all files in the directory
     const files = await fs.readdir(modelDir);
+    console.log(
+      `Found ${files.length} files for ${provider.modelProvider} ${provider.modelName}`
+    );
+
     if (files.length === 0) return false;
 
-    // Filter to only get JSON files
-    const jsonFiles = files.filter((file) => file.endsWith(".json"));
-    if (jsonFiles.length === 0) return false;
+    // Get today's date in YYYY-MM-DD format
+    const today = new Date().toISOString().split("T")[0];
+    console.log(`Today's date: ${today}`);
 
-    // Get the most recent file
-    const fileStats = await Promise.all(
-      jsonFiles.map(async (file) => {
-        const filePath = path.join(modelDir, file);
-        const stats = await fs.stat(filePath);
-        return { file, stats };
-      })
-    );
+    // First try to look for today's file specifically
+    const todayFileName = `${provider.modelProvider.toLowerCase()}_${provider.modelName.toLowerCase()}_${today}.json`;
+    console.log(`Looking for today's file: ${todayFileName}`);
 
-    // Sort by modification time, newest first
-    fileStats.sort((a, b) => b.stats.mtime.getTime() - a.stats.mtime.getTime());
+    const todayFiles = files.filter((file) => file === todayFileName);
 
-    if (fileStats.length === 0) return false;
+    if (todayFiles.length > 0) {
+      console.log(`Found today's file: ${todayFileName}`);
+      const filePath = path.join(modelDir, todayFileName);
 
-    // Check if the most recent file is less than 24 hours old
-    const mostRecentFile = fileStats[0];
-    const fileTime = mostRecentFile.stats.mtime.getTime();
-    const currentTime = new Date().getTime();
-    const hoursDiff = (currentTime - fileTime) / (1000 * 60 * 60);
+      try {
+        // Read today's file content
+        const fileContent = await fs.readFile(filePath, "utf-8");
+        console.log(`Successfully read file: ${filePath}`);
 
-    // Read the content of the most recent file to check outputs and errors
-    const fileContent = await fs.readFile(
-      path.join(modelDir, mostRecentFile.file),
-      "utf-8"
-    );
-    const parsedContent = JSON.parse(fileContent);
+        const parsedContent = JSON.parse(fileContent);
+        console.log(
+          `File parsed. Has outputs: ${!!parsedContent.outputs
+            ?.length}, Has errors: ${!!parsedContent.error}`
+        );
 
-    const lastRunWithin24Hours = hoursDiff < 24;
-    // Check if outputs exist or if there's an error message
-    if (parsedContent.outputs && parsedContent.outputs.length > 0) {
-      console.warn(
-        `Skipping ${provider.modelProvider} ${provider.modelName} - outputs already exist.`
+        // If there are outputs and no errors, skip this model
+        if (parsedContent.outputs?.length > 0 && !parsedContent.error) {
+          console.log(
+            `Skipping ${provider.modelProvider} ${provider.modelName} - successful run exists today`
+          );
+          return true;
+        }
+
+        console.log(
+          `Run needed - file has ${
+            parsedContent.outputs?.length || 0
+          } outputs and error: ${!!parsedContent.error}`
+        );
+      } catch (fileError) {
+        console.warn(`Error reading or parsing today's file: ${fileError}`);
+      }
+    } else {
+      console.log(`No file found for today with name: ${todayFileName}`);
+
+      // If no today's file, check if there are any recent files (last 24 hours)
+      const fileStats = await Promise.all(
+        files
+          .filter((file) => file.endsWith(".json"))
+          .map(async (file) => {
+            const filePath = path.join(modelDir, file);
+            const stats = await fs.stat(filePath);
+            return { file, stats, filePath };
+          })
       );
-      return true;
+
+      // Sort by modification time, newest first
+      fileStats.sort(
+        (a, b) => b.stats.mtime.getTime() - a.stats.mtime.getTime()
+      );
+
+      if (fileStats.length > 0) {
+        const newestFile = fileStats[0];
+        console.log(
+          `Most recent file: ${
+            newestFile.file
+          } (${newestFile.stats.mtime.toISOString()})`
+        );
+
+        const hoursSinceLastRun =
+          (Date.now() - newestFile.stats.mtime.getTime()) / (1000 * 60 * 60);
+        console.log(`Hours since last run: ${hoursSinceLastRun.toFixed(2)}`);
+
+        if (hoursSinceLastRun < 24) {
+          try {
+            const fileContent = await fs.readFile(newestFile.filePath, "utf-8");
+            const parsedContent = JSON.parse(fileContent);
+
+            if (parsedContent.outputs?.length > 0 && !parsedContent.error) {
+              console.log(
+                `Skipping ${provider.modelProvider} ${provider.modelName} - successful run exists within last 24 hours`
+              );
+              return true;
+            }
+          } catch (fileError) {
+            console.warn(`Error reading or parsing recent file: ${fileError}`);
+          }
+        }
+      }
     }
 
-    if (
-      parsedContent.error &&
-      parsedContent.error.message &&
-      lastRunWithin24Hours
-    ) {
-      console.warn(
-        `Skipping ${provider.modelProvider} ${provider.modelName} - error message exists: ${parsedContent.error.message}`
-      );
-      // Allow run if last run was an error
-      return false;
-    }
-
-    return lastRunWithin24Hours;
+    // Default to running the model
+    console.log(
+      `Will run model ${provider.modelProvider} ${provider.modelName}`
+    );
+    return false;
   } catch (error) {
-    // If directory doesn't exist or any other error, we haven't run recently
+    // If any error occurs, log it and don't skip
+    console.warn(
+      `Error checking recent runs for ${provider.modelProvider} ${provider.modelName}: ${error}`
+    );
     return false;
   }
 };
