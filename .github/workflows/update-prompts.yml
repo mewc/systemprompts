@@ -1,0 +1,40 @@
+name: Update AI Prompts
+
+on:
+  schedule:
+    # https://crontab.guru/#0_0_*_*_1,3,5
+    - cron: '0 0 * * 1,3,5'  # Run weekly at midnight
+  workflow_dispatch:      # Allow manual triggers
+
+# Restrict to main/master branch and require specific permissions
+permissions:
+  contents: write
+  pull-requests: read
+
+jobs:
+  update-prompts:
+    # Only run on main/master branch
+    if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master'
+    runs-on: ubuntu-latest
+    
+    env:
+      NODE_ENV: production
+      GROK_API_KEY: ${{ secrets.GROK_API_KEY }}
+      OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+      ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+      GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+    
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # Ensure clean checkout
+          ref: ${{ github.ref }}
+          fetch-depth: 1
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          
+      - name: Run update script
+        run: ./run.sh 
