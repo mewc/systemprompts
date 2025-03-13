@@ -22,10 +22,6 @@ jobs:
     
     env:
       NODE_ENV: production
-      GROK_API_KEY: ${{ secrets.GROK_API_KEY }}
-      OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
-      ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
-      GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
     
     steps:
       - uses: actions/checkout@v4
@@ -37,7 +33,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: '20'  
           
       - name: Run update script
         run: ./run.sh 
